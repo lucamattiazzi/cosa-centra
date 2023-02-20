@@ -1,0 +1,98 @@
+<!doctype html>
+<html>
+
+<head>
+  <title>Cosa c'entra - Wiki powered version</title>
+  <script src="https://unpkg.com/showdown/dist/showdown.min.js"></script>
+  <style>
+    html {
+      max-width: 70ch;
+      padding: 3em 1em;
+      margin: auto;
+      line-height: 1.75;
+      font-size: 1.25em;
+      font-family: sans-serif;
+      background-color: linen;
+      color: #222
+    }
+
+    table {
+      font-family: monospace;
+      font-size: 1em;
+    }
+
+    td:first-child {
+      width: 15%;
+    }
+  </style>
+</head>
+
+<body>
+
+  <div id="root"></div>
+
+  <script>
+    const fetchJson = (url) => fetch(url).then(r => r.json())
+
+    async function retrieveResults() {
+      const list = await fetchJson("https://api.github.com/repos/lucamattiazzi/cosa-centra/contents/results")
+      const urls = list.map(l => l.download_url)
+      const jsonResults = await Promise.all(urls.map(fetchJson))
+      const sorted = jsonResults.sort((a, b) => {
+        const dateA = Date.parse(a.episode.split("-").reverse().join("/"))
+        const dateB = Date.parse(b.episode.split("-").reverse().join("/"))
+        return dateA - dateB
+      })
+      return sorted
+    }
+
+    async function writeReadme() {
+      const converter = new showdown.Converter()
+      const readmeResponse = await fetch("https://raw.githubusercontent.com/lucamattiazzi/cosa-centra/main/README.md")
+      const readme = await readmeResponse.text()
+      const html = converter.makeHtml(readme)
+      const root = document.getElementById("root")
+      root.innerHTML = html
+    }
+
+    async function writeResults() {
+      const results = document.getElementById("results")
+      const fillerParagraph = results.nextElementSibling
+      fillerParagraph.textContent = "The following are the results for each episode I've run my script against. You can check from the podcast website (listen to it, it's great!) that the podcast is still lacking in efficiency."
+      const jsonResults = await retrieveResults()
+      const table = document.createElement("table")
+      const header = document.createElement("tr")
+      const dateHeaderCell = document.createElement("td")
+      dateHeaderCell.textContent = "Date"
+      const pathHeaderCell = document.createElement("td")
+      pathHeaderCell.textContent = "Path"
+      const valueRows = jsonResults.map(r => {
+        const dateCell = document.createElement("td")
+        dateCell.innerText = r.episode
+        const pathCell = document.createElement("td")
+        pathCell.innerText = r.results.join(" -> ")
+        return [dateCell, pathCell]
+      })
+      const rows = [[dateHeaderCell, pathHeaderCell], ...valueRows]
+      for (const row of rows) {
+        const tableRow = document.createElement("tr")
+        tableRow.appendChild(row[0])
+        tableRow.appendChild(row[1])
+        table.appendChild(tableRow)
+      }
+      results.parentNode.insertBefore(table, fillerParagraph.nextElementSibling)
+    }
+
+    async function main() {
+      await writeReadme()
+      await writeResults()
+    }
+    main()
+  </script>
+  <a style="position:fixed;top:0;right:0" href="https://github.com/lucamattiazzi/cosa-centra"><img decoding="async"
+      loading="lazy" width="149" height="149"
+      src="https://github.blog/wp-content/uploads/2008/12/forkme_right_darkblue_121621.png?resize=149%2C149"
+      class="attachment-full size-full" alt="Fork me on GitHub" data-recalc-dims="1"></a>
+</body>
+
+</html>
